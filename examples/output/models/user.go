@@ -36,6 +36,7 @@ var User = struct {
 	IsAdult    field.Bool
 	Profile    examples.JSON
 	AwardTypes field.Struct[datatypes.JSONSlice[int]]
+	Tag        field.Field[models.UserTagType]
 	TagTypes   field.Struct[datatypes.JSONSlice[models.UserTagType]]
 }{
 	ID:         field.Number[uint]{}.WithColumn("id"),
@@ -61,6 +62,7 @@ var User = struct {
 	IsAdult:    field.Bool{}.WithColumn("is_adult"),
 	Profile:    examples.JSON{}.WithColumn("profile"),
 	AwardTypes: field.Struct[datatypes.JSONSlice[int]]{}.WithName("AwardTypes"),
+	Tag:        field.Field[models.UserTagType]{}.WithColumn("tag"),
 	TagTypes:   field.Struct[datatypes.JSONSlice[models.UserTagType]]{}.WithName("TagTypes"),
 }
 

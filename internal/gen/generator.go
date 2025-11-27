@@ -466,7 +466,7 @@ func (f Field) Type() string {
 	}
 
 	if typ := loadNamedType(f.file.goModDir, f.file.getFullImportPath(pkgName), typName); typ != nil {
-		if ImplementsAllowedInterfaces(typ) {
+		if ImplementsAllowedInterfaces(typ) || IsUnderlyingComparable(typ) {
 			return fmt.Sprintf("field.Field[%s]", filepath.Base(goType))
 		}
 	}

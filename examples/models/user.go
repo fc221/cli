@@ -39,6 +39,7 @@ type User struct {
 	Profile    string `gen:"json"`
 	AwardTypes datatypes.JSONSlice[int]
 	TagTypes   datatypes.JSONSlice[UserTagType]
+	Tag        UserTagType
 }
 
 type UserTagType string

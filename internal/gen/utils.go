@@ -73,6 +73,14 @@ func ImplementsAllowedInterfaces(typ types.Type) bool {
 	return false
 }
 
+func IsUnderlyingComparable(typ types.Type) bool {
+	underlying := typ.Underlying()
+	if _, ok := underlying.(*types.Struct); ok {
+		return false
+	}
+	return types.Comparable(underlying)
+}
+
 func findGoModDir(filename string) string {
 	cmd := exec.Command("go", "env", "GOMOD")
 	cmd.Dir = filepath.Dir(filename)
