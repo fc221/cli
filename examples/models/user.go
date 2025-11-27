@@ -38,7 +38,10 @@ type User struct {
 	IsAdult    bool   `gorm:"column:is_adult"`
 	Profile    string `gen:"json"`
 	AwardTypes datatypes.JSONSlice[int]
+	TagTypes   datatypes.JSONSlice[UserTagType]
 }
+
+type UserTagType string
 
 type Account struct {
 	gorm.Model

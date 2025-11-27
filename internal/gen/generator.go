@@ -433,12 +433,24 @@ func (f Field) Type() string {
 	}
 
 	// Check if type implements allowed interfaces
+	goType := strings.TrimPrefix(f.GoType, "*")
+
+	// Process generic type parameters to convert full paths to short names
+	goType = f.processGenericType(goType)
+
 	var (
-		goType  = strings.TrimPrefix(f.GoType, "*")
-		pkgIdx  = strings.LastIndex(goType, ".")
+		pkgIdx  int
 		pkgName = f.file.Package
 		typName = goType
 	)
+
+	// Find the last '.' before any generic bracket '['
+	bracketIdx := strings.Index(goType, "[")
+	if bracketIdx != -1 {
+		pkgIdx = strings.LastIndex(goType[:bracketIdx], ".")
+	} else {
+		pkgIdx = strings.LastIndex(goType, ".")
+	}
 
 	if pkgIdx > 0 {
 		pkgName, typName = goType[:pkgIdx], goType[pkgIdx+1:]
@@ -454,7 +466,7 @@ func (f Field) Type() string {
 	}
 
 	if typ := loadNamedType(f.file.goModDir, f.file.getFullImportPath(pkgName), typName); typ != nil {
-		if ImplementsAllowedInterfaces(typ) { // For interface-implementing types, use generic Field
+		if ImplementsAllowedInterfaces(typ) {
 			return fmt.Sprintf("field.Field[%s]", filepath.Base(goType))
 		}
 	}
@@ -468,6 +480,87 @@ func (f Field) Type() string {
 	}
 
 	return fmt.Sprintf("field.Field[%s]", filepath.Base(goType))
+}
+
+// processGenericType converts full package paths in generic type parameters to short names
+// and ensures required imports are added
+// e.g., "datatypes.JSONSlice[gorm.io/cli/gorm/examples/models.UserTagType]"
+//
+//	-> "datatypes.JSONSlice[models.UserTagType]"
+func (f Field) processGenericType(goType string) string {
+	bracketIdx := strings.Index(goType, "[")
+	if bracketIdx == -1 {
+		return goType
+	}
+
+	// Split into base type and type parameters
+	baseType := goType[:bracketIdx]
+	remaining := goType[bracketIdx+1:]
+
+	// Find matching closing bracket
+	depth := 1
+	endIdx := 0
+	for i, ch := range remaining {
+		if ch == '[' {
+			depth++
+		} else if ch == ']' {
+			depth--
+			if depth == 0 {
+				endIdx = i
+				break
+			}
+		}
+	}
+
+	if endIdx == 0 {
+		return goType
+	}
+
+	params := remaining[:endIdx]
+	suffix := remaining[endIdx+1:]
+
+	// Process each type parameter
+	var processedParams []string
+	paramParts := strings.Split(params, ",")
+
+	for _, param := range paramParts {
+		param = strings.TrimSpace(param)
+
+		// Recursively process nested generics
+		param = f.processGenericType(param)
+
+		// Convert full package path to short name
+		if lastDot := strings.LastIndex(param, "."); lastDot > 0 {
+			fullPkgPath := param[:lastDot]
+			typeName := param[lastDot+1:]
+
+			// Get or create short package name
+			shortName := filepath.Base(fullPkgPath)
+
+			// Ensure import exists
+			f.file.ensureImport(shortName, fullPkgPath)
+
+			param = shortName + "." + typeName
+		}
+
+		processedParams = append(processedParams, param)
+	}
+
+	return baseType + "[" + strings.Join(processedParams, ", ") + "]" + suffix
+}
+
+// ensureImport adds an import if it doesn't already exist
+func (p *File) ensureImport(name, path string) {
+	for _, imp := range p.Imports {
+		if imp.Path == path {
+			return
+		}
+	}
+
+	p.Imports = append(p.Imports, Import{
+		Name: name,
+		Path: path,
+	})
 }
 
 // Value returns the field value string with column name for template generation

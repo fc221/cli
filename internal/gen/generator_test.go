@@ -179,6 +179,7 @@ func TestProcessStructType(t *testing.T) {
 			{Name: "IsAdult", DBName: "is_adult", GoType: "bool"},
 			{Name: "Profile", DBName: "profile", GoType: "string", NamedGoType: "json"},
 			{Name: "AwardTypes", DBName: "award_types", GoType: "datatypes.JSONSlice[int]"},
+			{Name: "TagTypes", DBName: "tag_types", GoType: "datatypes.JSONSlice[UserTagType]"},
 		},
 	}
 
