@@ -4,9 +4,10 @@ import (
 	"database/sql"
 	"time"
 
+	"gorm.io/cli/gorm/examples/models/enum"
+	enum2 "gorm.io/cli/gorm/examples/models/enum/enum"
 	"gorm.io/cli/gorm/genconfig"
 	"gorm.io/datatypes"
-	datatypes2 "gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -39,8 +40,10 @@ type User struct {
 	IsAdult    bool   `gorm:"column:is_adult"`
 	Profile    string `gen:"json"`
 	AwardTypes datatypes.JSONSlice[int]
-	TagTypes   datatypes2.JSONSlice[UserTagType]
+	TagTypes   datatypes.JSONSlice[UserTagType]
 	Tag        UserTagType
+	Enum       enum.Enum
+	Enum2      enum2.Enum
 }
 
 type UserTagType string
