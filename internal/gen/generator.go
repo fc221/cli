@@ -435,9 +435,6 @@ func (f Field) Type() string {
 	// Check if type implements allowed interfaces
 	goType := strings.TrimPrefix(f.GoType, "*")
 
-	// Process generic type parameters to convert full paths to short names
-	goType = f.processGenericType(goType)
-
 	var (
 		pkgIdx  int
 		pkgName = f.file.Package
@@ -465,21 +462,24 @@ func (f Field) Type() string {
 		return fmt.Sprintf("field.Number[%s]", goType)
 	}
 
+	// Process generic type parameters to convert full paths to short names
+	goType = f.processGenericType(goType)
+
 	if typ := loadNamedType(f.file.goModDir, f.file.getFullImportPath(pkgName), typName); typ != nil {
 		if ImplementsAllowedInterfaces(typ) || IsUnderlyingComparable(typ) {
-			return fmt.Sprintf("field.Field[%s]", filepath.Base(goType))
+			return fmt.Sprintf("field.Field[%s]", goType)
 		}
 	}
 
 	// Check if this is a relation field based on its type
 	if strings.HasPrefix(goType, "[]") {
-		elementType := filepath.Base(strings.TrimPrefix(goType, "[]"))
+		elementType := strings.TrimPrefix(goType, "[]")
 		return fmt.Sprintf("field.Slice[%s]", elementType)
 	} else if strings.Contains(goType, ".") {
-		return fmt.Sprintf("field.Struct[%s]", filepath.Base(goType))
+		return fmt.Sprintf("field.Struct[%s]", goType)
 	}
 
-	return fmt.Sprintf("field.Field[%s]", filepath.Base(goType))
+	return fmt.Sprintf("field.Field[%s]", goType)
 }
 
 // processGenericType converts full package paths in generic type parameters to short names
@@ -488,79 +488,62 @@ func (f Field) Type() string {
 //
 //	-> "datatypes.JSONSlice[models.UserTagType]"
 func (f Field) processGenericType(goType string) string {
-	bracketIdx := strings.Index(goType, "[")
-	if bracketIdx == -1 {
-		return goType
+	goType = strings.TrimSpace(goType)
+
+	// Handle pointer types by recursively processing without the pointer prefix
+	if strings.HasPrefix(goType, "*") {
+		return f.processGenericType(goType[1:])
 	}
 
-	// Split into base type and type parameters
-	baseType := goType[:bracketIdx]
-	remaining := goType[bracketIdx+1:]
-
-	// Find matching closing bracket
-	depth := 1
-	endIdx := 0
-	for i, ch := range remaining {
-		if ch == '[' {
-			depth++
-		} else if ch == ']' {
-			depth--
-			if depth == 0 {
-				endIdx = i
-				break
-			}
-		}
+	// Handle slice types by recursively processing the element type
+	if strings.HasPrefix(goType, "[]") {
+		return "[]" + f.processGenericType(goType[2:])
 	}
 
-	if endIdx == 0 {
-		return goType
-	}
+	// Split the type into the main identifier and the generic arguments (separated by '[')
+	mainPart, argsPart, hasArgs := strings.Cut(goType, "[")
 
-	params := remaining[:endIdx]
-	suffix := remaining[endIdx+1:]
+	// Resolve the package alias for the main type
+	shortMain := f.file.getImportAliasType(mainPart)
 
-	// Process each type parameter
-	var processedParams []string
-	paramParts := strings.Split(params, ",")
+	// If generic arguments exist, process them recursively
+	if hasArgs {
+		// Remove the trailing closing bracket ']' from the arguments part
+		cleanArgs := strings.TrimSuffix(argsPart, "]")
 
-	for _, param := range paramParts {
-		param = strings.TrimSpace(param)
+		// Split the arguments string by comma, respecting nested brackets
+		// e.g., "TypeA, Map[K,V]" -> ["TypeA", "Map[K,V]"]
+		args := splitGenericArgs(cleanArgs)
 
-		// Recursively process nested generics
-		param = f.processGenericType(param)
-
-		// Convert full package path to short name
-		if lastDot := strings.LastIndex(param, "."); lastDot > 0 {
-			fullPkgPath := param[:lastDot]
-			typeName := param[lastDot+1:]
-
-			// Get or create short package name
-			shortName := filepath.Base(fullPkgPath)
-
-			// Ensure import exists
-			f.file.ensureImport(shortName, fullPkgPath)
-
-			param = shortName + "." + typeName
+		var simplifiedArgs []string
+		for _, arg := range args {
+			simplifiedArgs = append(simplifiedArgs, f.processGenericType(arg))
 		}
 
-		processedParams = append(processedParams, param)
+		return shortMain + "[" + strings.Join(simplifiedArgs, ", ") + "]"
 	}
 
-	return baseType + "[" + strings.Join(processedParams, ", ") + "]" + suffix
+	return shortMain
 }
 
-// ensureImport adds an import if it doesn't already exist
-func (p *File) ensureImport(name, path string) {
-	for _, imp := range p.Imports {
-		if imp.Path == path {
-			return
-		}
+// getImportAliasType returns the import alias type string for a raw type string
+// e.g., "datatypes2 gorm.io/datatypes.JSONSlice" -> "datatypes2.JSONSlice"
+func (p *File) getImportAliasType(raw string) string {
+	lastDot := strings.LastIndex(raw, ".")
+	if lastDot == -1 {
+		return raw
 	}
 
-	p.Imports = append(p.Imports, Import{
-		Name: name,
-		Path: path,
-	})
+	pathStr := raw[:lastDot]
+	typeName := raw[lastDot+1:]
+
+	pkgName := filepath.Base(pathStr)
+	imp := p.getImport(pathStr)
+	if imp != nil {
+		pkgName = imp.Name
+	}
+
+	return pkgName + "." + typeName
 }
 
 // Value returns the field value string with column name for template generation
@@ -868,6 +851,15 @@ func (p *File) getFullImportPath(shortName string) string {
 		}
 	}
 	return shortName
+}
+
+func (p *File) getImport(path string) *Import {
+	for _, i := range p.Imports {
+		if i.Path == path {
+			return &i
+		}
+	}
+	return nil
 }
 
 // handleAnonymousEmbedding processes anonymous embedded fields and returns true if handled

@@ -210,3 +210,27 @@ func stripGeneric(s string) string {
 	}
 	return s
 }
+
+// splitGenericArgs splits a generic type argument string into individual arguments.
+func splitGenericArgs(s string) []string {
+	var args []string
+	depth := 0
+	start := 0
+	for i, char := range s {
+		switch char {
+		case '[':
+			depth++
+		case ']':
+			depth--
+		case ',':
+			if depth == 0 {
+				args = append(args, s[start:i])
+				start = i + 1
+			}
+		}
+	}
+	if start < len(s) {
+		args = append(args, s[start:])
+	}
+	return args
+}

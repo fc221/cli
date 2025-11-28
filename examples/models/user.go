@@ -6,6 +6,7 @@ import (
 
 	"gorm.io/cli/gorm/genconfig"
 	"gorm.io/datatypes"
+	datatypes2 "gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -38,7 +39,7 @@ type User struct {
 	IsAdult    bool   `gorm:"column:is_adult"`
 	Profile    string `gen:"json"`
 	AwardTypes datatypes.JSONSlice[int]
-	TagTypes   datatypes.JSONSlice[UserTagType]
+	TagTypes   datatypes2.JSONSlice[UserTagType]
 	Tag        UserTagType
 }
 
