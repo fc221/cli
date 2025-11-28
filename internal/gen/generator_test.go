@@ -181,6 +181,8 @@ func TestProcessStructType(t *testing.T) {
 			{Name: "AwardTypes", DBName: "award_types", GoType: "datatypes.JSONSlice[int]"},
 			{Name: "TagTypes", DBName: "tag_types", GoType: "datatypes.JSONSlice[UserTagType]"},
 			{Name: "Tag", DBName: "tag", GoType: "UserTagType"},
+			{Name: "Enum", DBName: "enum", GoType: "enum.Enum"}, // 添加
+			{Name: "Enum2", DBName: "enum2", GoType: "enum2.Enum"},
 		},
 	}
 
